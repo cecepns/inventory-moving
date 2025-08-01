@@ -20,7 +20,7 @@ const MasterData = () => {
   });
 
   const categories = ['Gudang Kain', 'Gudang Dus', 'Gudang Tali'];
-  const units = ['pcs', 'kg', 'meter', 'roll', 'box'];
+  const units = ['meter', 'yard', 'pcs', 'batang', 'lembar', 'gross', 'pasang'];
 
   useEffect(() => {
     fetchItems();
