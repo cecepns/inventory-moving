@@ -136,7 +136,7 @@ app.get('/api/items', authenticateToken, async (req, res) => {
 
 app.post('/api/items', authenticateToken, async (req, res) => {
   try {
-    const { name, code, category, unit, min_stock, price, description } = req.body;
+    const { name, code, category, unit, min_stock, price, description, input_date } = req.body;
     
     // Check if code already exists
     const [existing] = await db.execute(
@@ -149,8 +149,8 @@ app.post('/api/items', authenticateToken, async (req, res) => {
     }
 
     const [result] = await db.execute(
-      'INSERT INTO items (name, code, category, unit, min_stock, price, description) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [name, code, category, unit, min_stock, price, description]
+      'INSERT INTO items (name, code, category, unit, min_stock, price, description, input_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [name, code, category, unit, min_stock, price, description, input_date]
     );
 
     res.status(201).json({ 
@@ -166,7 +166,7 @@ app.post('/api/items', authenticateToken, async (req, res) => {
 app.put('/api/items/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, code, category, unit, min_stock, price, description } = req.body;
+    const { name, code, category, unit, min_stock, price, description, input_date } = req.body;
     
     // Check if code already exists for different item
     const [existing] = await db.execute(
@@ -179,8 +179,8 @@ app.put('/api/items/:id', authenticateToken, async (req, res) => {
     }
 
     await db.execute(
-      'UPDATE items SET name = ?, code = ?, category = ?, unit = ?, min_stock = ?, price = ?, description = ?, updated_at = NOW() WHERE id = ?',
-      [name, code, category, unit, min_stock, price, description, id]
+      'UPDATE items SET name = ?, code = ?, category = ?, unit = ?, min_stock = ?, price = ?, description = ?, input_date = ?, updated_at = NOW() WHERE id = ?',
+      [name, code, category, unit, min_stock, price, description, input_date, id]
     );
 
     res.json({ message: 'Item updated successfully' });
@@ -456,19 +456,19 @@ app.get('/api/reports', authenticateToken, async (req, res) => {
     // Stock report
     const [stockReport] = await db.execute(`
       SELECT 
-        i.id, i.name, i.code, i.category, i.unit, i.min_stock, i.price,
+        i.id, i.name, i.code, i.category, i.unit, i.min_stock, i.price, i.input_date,
         COALESCE(SUM(CASE WHEN t.type = 'in' THEN t.quantity ELSE 0 END) - 
         SUM(CASE WHEN t.type = 'out' THEN t.quantity ELSE 0 END), 0) as current_stock
       FROM items i
       LEFT JOIN transactions t ON i.id = t.item_id
-      GROUP BY i.id, i.name, i.code, i.category, i.unit, i.min_stock, i.price
+      GROUP BY i.id, i.name, i.code, i.category, i.unit, i.min_stock, i.price, i.input_date
       ORDER BY i.name
     `);
 
     // Fast moving analysis
     const [fastMoving] = await db.execute(`
       SELECT 
-        i.id, i.name, i.code, i.category, i.unit,
+        i.id, i.name, i.code, i.category, i.unit, i.input_date,
         COALESCE(SUM(CASE WHEN t.type = 'out' THEN t.quantity ELSE 0 END), 0) as total_out,
         CASE 
           WHEN AVG(CASE WHEN t.type = 'in' THEN t.quantity ELSE NULL END) > 0 
@@ -478,7 +478,7 @@ app.get('/api/reports', authenticateToken, async (req, res) => {
         END as turnover_ratio
       FROM items i
       LEFT JOIN transactions t ON i.id = t.item_id
-      GROUP BY i.id, i.name, i.code, i.category, i.unit
+      GROUP BY i.id, i.name, i.code, i.category, i.unit, i.input_date
       HAVING turnover_ratio >= 2.0
       ORDER BY turnover_ratio DESC
     `);
@@ -486,7 +486,7 @@ app.get('/api/reports', authenticateToken, async (req, res) => {
     // Slow moving analysis
     const [slowMoving] = await db.execute(`
       SELECT 
-        i.id, i.name, i.code, i.category, i.unit,
+        i.id, i.name, i.code, i.category, i.unit, i.input_date,
         COALESCE(SUM(CASE WHEN t.type = 'out' THEN t.quantity ELSE 0 END), 0) as total_out,
         CASE 
           WHEN AVG(CASE WHEN t.type = 'in' THEN t.quantity ELSE NULL END) > 0 
@@ -496,7 +496,7 @@ app.get('/api/reports', authenticateToken, async (req, res) => {
         END as turnover_ratio
       FROM items i
       LEFT JOIN transactions t ON i.id = t.item_id
-      GROUP BY i.id, i.name, i.code, i.category, i.unit
+      GROUP BY i.id, i.name, i.code, i.category, i.unit, i.input_date
       HAVING turnover_ratio >= 0.5 AND turnover_ratio < 2.0
       ORDER BY turnover_ratio ASC
     `);
@@ -504,13 +504,13 @@ app.get('/api/reports', authenticateToken, async (req, res) => {
     // Dead stock analysis
     const [deadStock] = await db.execute(`
       SELECT 
-        i.id, i.name, i.code, i.category, i.unit, i.price,
+        i.id, i.name, i.code, i.category, i.unit, i.price, i.input_date,
         COALESCE(SUM(CASE WHEN t.type = 'in' THEN t.quantity ELSE 0 END) - 
         SUM(CASE WHEN t.type = 'out' THEN t.quantity ELSE 0 END), 0) as current_stock,
         MAX(CASE WHEN t.type = 'out' THEN t.date ELSE NULL END) as last_out_date
       FROM items i
       LEFT JOIN transactions t ON i.id = t.item_id
-      GROUP BY i.id, i.name, i.code, i.category, i.unit, i.price
+      GROUP BY i.id, i.name, i.code, i.category, i.unit, i.price, i.input_date
       HAVING (
         (last_out_date IS NULL OR last_out_date < DATE_SUB(CURDATE(), INTERVAL 6 MONTH))
         AND current_stock > 0

@@ -16,7 +16,8 @@ const MasterData = () => {
     unit: '',
     min_stock: '',
     price: '',
-    description: ''
+    description: '',
+    input_date: ''
   });
 
   const categories = ['Gudang Kain', 'Gudang Dus', 'Gudang Tali'];
@@ -72,7 +73,8 @@ const MasterData = () => {
       unit: item.unit,
       min_stock: item.min_stock.toString(),
       price: item.price.toString(),
-      description: item.description || ''
+      description: item.description || '',
+      input_date: item.input_date || ''
     });
     setShowForm(true);
   };
@@ -97,7 +99,8 @@ const MasterData = () => {
       unit: '',
       min_stock: '',
       price: '',
-      description: ''
+      description: '',
+      input_date: ''
     });
     setEditingItem(null);
     setShowForm(false);
@@ -271,6 +274,20 @@ const MasterData = () => {
                 />
               </div>
 
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Tanggal Input
+                </label>
+                <input
+                  type="date"
+                  name="input_date"
+                  value={formData.input_date}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+
               <div className="flex space-x-3 pt-4">
                 <button
                   type="submit"
@@ -317,6 +334,9 @@ const MasterData = () => {
                   Harga
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Tanggal Input
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Aksi
                 </th>
               </tr>
@@ -341,6 +361,9 @@ const MasterData = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     Rp {parseInt(item.price).toLocaleString('id-ID')}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {item.input_date ? new Date(item.input_date).toLocaleDateString('id-ID') : '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                     <button
