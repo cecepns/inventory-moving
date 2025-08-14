@@ -74,7 +74,7 @@ const MasterData = () => {
       min_stock: item.min_stock.toString(),
       price: item.price.toString(),
       description: item.description || '',
-      input_date: item.input_date || ''
+      input_date: item.input_date ? new Date(item.input_date).toISOString().split('T')[0] : ''
     });
     setShowForm(true);
   };
@@ -151,9 +151,9 @@ const MasterData = () => {
 
       {/* Form Modal */}
       {showForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md mx-4">
-            <div className="flex items-center justify-between mb-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <h2 className="text-xl font-bold text-gray-900">
                 {editingItem ? 'Edit Barang' : 'Tambah Barang'}
               </h2>
@@ -165,7 +165,8 @@ const MasterData = () => {
               </button>
             </div>
             
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form id="itemForm" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6">
+              <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Nama Barang
@@ -288,23 +289,26 @@ const MasterData = () => {
                 />
               </div>
 
-              <div className="flex space-x-3 pt-4">
-                <button
-                  type="submit"
-                  className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 flex items-center justify-center space-x-2"
-                >
-                  <Save size={16} />
-                  <span>{editingItem ? 'Update' : 'Simpan'}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={resetForm}
-                  className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400"
-                >
-                  Batal
-                </button>
               </div>
             </form>
+            
+            <div className="flex space-x-3 p-6 border-t border-gray-200">
+              <button
+                type="submit"
+                form="itemForm"
+                className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 flex items-center justify-center space-x-2"
+              >
+                <Save size={16} />
+                <span>{editingItem ? 'Update' : 'Simpan'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={resetForm}
+                className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400"
+              >
+                Batal
+              </button>
+            </div>
           </div>
         </div>
       )}
