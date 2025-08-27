@@ -50,10 +50,21 @@ const MasterData = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      // Clean up form data - convert empty strings to null for optional fields
+      const cleanFormData = {
+        ...formData,
+        category: formData.category.trim() || null,
+        unit: formData.unit.trim() || null,
+        min_stock: formData.min_stock.trim() || null,
+        price: formData.price.trim() || null,
+        description: formData.description.trim() || null,
+        input_date: formData.input_date.trim() || null
+      };
+
       if (editingItem) {
-        await axios.put(`https://api-inventory.isavralabel.com/inventory-moving/api/items/${editingItem.id}`, formData);
+        await axios.put(`https://api-inventory.isavralabel.com/inventory-moving/api/items/${editingItem.id}`, cleanFormData);
       } else {
-        await axios.post('https://api-inventory.isavralabel.com/inventory-moving/api/items', formData);
+        await axios.post('https://api-inventory.isavralabel.com/inventory-moving/api/items', cleanFormData);
       }
       
       resetForm();

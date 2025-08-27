@@ -54,15 +54,18 @@ const Receiving = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const transactionData = {
+      // Clean up form data - convert empty strings to null for optional fields
+      const cleanFormData = {
         ...formData,
+        supplier: formData.supplier.trim() || null,
+        notes: formData.notes.trim() || null,
         type: 'in'
       };
 
       if (editingTransaction) {
-        await axios.put(`https://api-inventory.isavralabel.com/inventory-moving/api/transactions/${editingTransaction.id}`, transactionData);
+        await axios.put(`https://api-inventory.isavralabel.com/inventory-moving/api/transactions/${editingTransaction.id}`, cleanFormData);
       } else {
-        await axios.post('https://api-inventory.isavralabel.com/inventory-moving/api/transactions', transactionData);
+        await axios.post('https://api-inventory.isavralabel.com/inventory-moving/api/transactions', cleanFormData);
       }
       
       resetForm();

@@ -138,6 +138,14 @@ app.post('/api/items', authenticateToken, async (req, res) => {
   try {
     const { name, code, category, unit, min_stock, price, description, input_date } = req.body;
     
+    // Handle undefined values by converting them to null
+    const cleanCategory = category || null;
+    const cleanUnit = unit || null;
+    const cleanMinStock = min_stock || null;
+    const cleanPrice = price || null;
+    const cleanDescription = description || null;
+    const cleanInputDate = input_date || null;
+    
     // Check if code already exists
     const [existing] = await db.execute(
       'SELECT id FROM items WHERE code = ?',
@@ -150,7 +158,7 @@ app.post('/api/items', authenticateToken, async (req, res) => {
 
     const [result] = await db.execute(
       'INSERT INTO items (name, code, category, unit, min_stock, price, description, input_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [name, code, category, unit, min_stock, price, description, input_date]
+      [name, code, cleanCategory, cleanUnit, cleanMinStock, cleanPrice, cleanDescription, cleanInputDate]
     );
 
     res.status(201).json({ 
@@ -168,6 +176,14 @@ app.put('/api/items/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
     const { name, code, category, unit, min_stock, price, description, input_date } = req.body;
     
+    // Handle undefined values by converting them to null
+    const cleanCategory = category || null;
+    const cleanUnit = unit || null;
+    const cleanMinStock = min_stock || null;
+    const cleanPrice = price || null;
+    const cleanDescription = description || null;
+    const cleanInputDate = input_date || null;
+    
     // Check if code already exists for different item
     const [existing] = await db.execute(
       'SELECT id FROM items WHERE code = ? AND id != ?',
@@ -180,7 +196,7 @@ app.put('/api/items/:id', authenticateToken, async (req, res) => {
 
     await db.execute(
       'UPDATE items SET name = ?, code = ?, category = ?, unit = ?, min_stock = ?, price = ?, description = ?, input_date = ?, updated_at = NOW() WHERE id = ?',
-      [name, code, category, unit, min_stock, price, description, input_date, id]
+      [name, code, cleanCategory, cleanUnit, cleanMinStock, cleanPrice, cleanDescription, cleanInputDate, id]
     );
 
     res.json({ message: 'Item updated successfully' });
@@ -253,6 +269,11 @@ app.post('/api/transactions', authenticateToken, async (req, res) => {
   try {
     const { item_id, quantity, type, date, supplier, recipient, notes } = req.body;
     
+    // Handle undefined values by converting them to null
+    const cleanSupplier = supplier || null;
+    const cleanRecipient = recipient || null;
+    const cleanNotes = notes || null;
+    
     // Check if sufficient stock for 'out' transactions
     if (type === 'out') {
       const [stockResult] = await db.execute(`
@@ -274,7 +295,7 @@ app.post('/api/transactions', authenticateToken, async (req, res) => {
 
     const [result] = await db.execute(
       'INSERT INTO transactions (item_id, quantity, type, date, supplier, recipient, notes, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [item_id, quantity, type, date, supplier, recipient, notes, req.user.id]
+      [item_id, quantity, type, date, cleanSupplier, cleanRecipient, cleanNotes, req.user.id]
     );
 
     res.status(201).json({ 
@@ -291,6 +312,11 @@ app.put('/api/transactions/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const { item_id, quantity, type, date, supplier, recipient, notes } = req.body;
+    
+    // Handle undefined values by converting them to null
+    const cleanSupplier = supplier || null;
+    const cleanRecipient = recipient || null;
+    const cleanNotes = notes || null;
     
     // Get original transaction
     const [original] = await db.execute(
@@ -323,7 +349,7 @@ app.put('/api/transactions/:id', authenticateToken, async (req, res) => {
 
     await db.execute(
       'UPDATE transactions SET item_id = ?, quantity = ?, type = ?, date = ?, supplier = ?, recipient = ?, notes = ?, updated_at = NOW() WHERE id = ?',
-      [item_id, quantity, type, date, supplier, recipient, notes, id]
+      [item_id, quantity, type, date, cleanSupplier, cleanRecipient, cleanNotes, id]
     );
 
     res.json({ message: 'Transaction updated successfully' });
