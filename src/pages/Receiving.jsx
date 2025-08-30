@@ -54,9 +54,17 @@ const Receiving = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      // Validate quantity
+      const quantity = Number(formData.quantity);
+      if (isNaN(quantity) || quantity <= 0) {
+        alert('Jumlah harus berupa angka positif');
+        return;
+      }
+
       // Clean up form data - convert empty strings to null for optional fields
       const cleanFormData = {
         ...formData,
+        quantity: quantity, // Ensure quantity is a number
         supplier: formData.supplier.trim() || null,
         notes: formData.notes.trim() || null,
         type: 'in'

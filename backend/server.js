@@ -62,15 +62,31 @@ app.post('/api/auth/login', async (req, res) => {
       [username]
     );
 
-    if (users.length === 0) {
-      return res.status(401).json({ message: 'Invalid credentials' });
+    const usernameExists = users.length > 0;
+    let passwordValid = false;
+    let user = null;
+
+    if (usernameExists) {
+      user = users[0];
+      passwordValid = await bcrypt.compare(password, user.password);
     }
 
-    const user = users[0];
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-
-    if (!isPasswordValid) {
-      return res.status(401).json({ message: 'Invalid credentials' });
+    // Determine the appropriate error message
+    if (!usernameExists && !passwordValid) {
+      return res.status(401).json({ 
+        message: 'Username dan password salah',
+        errorType: 'both'
+      });
+    } else if (!usernameExists) {
+      return res.status(401).json({ 
+        message: 'Salah memasukan username',
+        errorType: 'username'
+      });
+    } else if (!passwordValid) {
+      return res.status(401).json({ 
+        message: 'Salah memasukan password',
+        errorType: 'password'
+      });
     }
 
     const token = jwt.sign(
@@ -119,8 +135,8 @@ app.get('/api/items', authenticateToken, async (req, res) => {
       FROM items i
       LEFT JOIN (
         SELECT item_id, 
-               SUM(CASE WHEN type = 'in' THEN quantity ELSE 0 END) - 
-               SUM(CASE WHEN type = 'out' THEN quantity ELSE 0 END) as current_stock
+               COALESCE(SUM(CASE WHEN type = 'in' THEN quantity ELSE 0 END), 0) - 
+               COALESCE(SUM(CASE WHEN type = 'out' THEN quantity ELSE 0 END), 0) as current_stock
         FROM transactions 
         GROUP BY item_id
       ) s ON i.id = s.item_id
@@ -130,6 +146,52 @@ app.get('/api/items', authenticateToken, async (req, res) => {
     res.json(items);
   } catch (error) {
     console.error('Get items error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Debug endpoint to check stock for a specific item
+app.get('/api/debug/stock/:itemId', authenticateToken, async (req, res) => {
+  try {
+    const { itemId } = req.params;
+    
+    // Get all transactions for the item
+    const [transactions] = await db.execute(`
+      SELECT id, type, quantity, date, created_at
+      FROM transactions 
+      WHERE item_id = ?
+      ORDER BY created_at ASC
+    `, [itemId]);
+    
+    // Calculate current stock
+    const [stockResult] = await db.execute(`
+      SELECT 
+        COALESCE(SUM(CASE WHEN type = 'in' THEN quantity ELSE 0 END), 0) as total_in,
+        COALESCE(SUM(CASE WHEN type = 'out' THEN quantity ELSE 0 END), 0) as total_out,
+        COALESCE(SUM(CASE WHEN type = 'in' THEN quantity ELSE 0 END), 0) - 
+        COALESCE(SUM(CASE WHEN type = 'out' THEN quantity ELSE 0 END), 0) as current_stock
+      FROM transactions 
+      WHERE item_id = ?
+    `, [itemId]);
+    
+    // Get item details
+    const [itemResult] = await db.execute(
+      'SELECT id, name, code FROM items WHERE id = ?',
+      [itemId]
+    );
+    
+    res.json({
+      item: itemResult[0] || null,
+      transactions,
+      stock: stockResult[0],
+      summary: {
+        totalIn: Number(stockResult[0].total_in),
+        totalOut: Number(stockResult[0].total_out),
+        currentStock: Number(stockResult[0].current_stock)
+      }
+    });
+  } catch (error) {
+    console.error('Debug stock error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 });
@@ -269,6 +331,12 @@ app.post('/api/transactions', authenticateToken, async (req, res) => {
   try {
     const { item_id, quantity, type, date, supplier, recipient, notes } = req.body;
     
+    // Ensure quantity is a valid number
+    const cleanQuantity = Number(quantity);
+    if (isNaN(cleanQuantity) || cleanQuantity <= 0) {
+      return res.status(400).json({ message: 'Quantity must be a positive number' });
+    }
+    
     // Handle undefined values by converting them to null
     const cleanSupplier = supplier || null;
     const cleanRecipient = recipient || null;
@@ -278,15 +346,17 @@ app.post('/api/transactions', authenticateToken, async (req, res) => {
     if (type === 'out') {
       const [stockResult] = await db.execute(`
         SELECT 
-          SUM(CASE WHEN type = 'in' THEN quantity ELSE 0 END) - 
-          SUM(CASE WHEN type = 'out' THEN quantity ELSE 0 END) as current_stock
+          COALESCE(SUM(CASE WHEN type = 'in' THEN quantity ELSE 0 END), 0) - 
+          COALESCE(SUM(CASE WHEN type = 'out' THEN quantity ELSE 0 END), 0) as current_stock
         FROM transactions 
         WHERE item_id = ?
       `, [item_id]);
 
-      const currentStock = stockResult[0].current_stock || 0;
+      const currentStock = Number(stockResult[0].current_stock) || 0;
       
-      if (currentStock < quantity) {
+      console.log(`Stock check - Item ID: ${item_id}, Current Stock: ${currentStock}, Requested: ${cleanQuantity}`);
+      
+      if (currentStock < cleanQuantity) {
         return res.status(400).json({ 
           message: `Insufficient stock. Available: ${currentStock}` 
         });
@@ -295,7 +365,7 @@ app.post('/api/transactions', authenticateToken, async (req, res) => {
 
     const [result] = await db.execute(
       'INSERT INTO transactions (item_id, quantity, type, date, supplier, recipient, notes, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [item_id, quantity, type, date, cleanSupplier, cleanRecipient, cleanNotes, req.user.id]
+      [item_id, cleanQuantity, type, date, cleanSupplier, cleanRecipient, cleanNotes, req.user.id]
     );
 
     res.status(201).json({ 
@@ -312,6 +382,12 @@ app.put('/api/transactions/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const { item_id, quantity, type, date, supplier, recipient, notes } = req.body;
+    
+    // Ensure quantity is a valid number
+    const cleanQuantity = Number(quantity);
+    if (isNaN(cleanQuantity) || cleanQuantity <= 0) {
+      return res.status(400).json({ message: 'Quantity must be a positive number' });
+    }
     
     // Handle undefined values by converting them to null
     const cleanSupplier = supplier || null;
@@ -332,15 +408,17 @@ app.put('/api/transactions/:id', authenticateToken, async (req, res) => {
     if (type === 'out') {
       const [stockResult] = await db.execute(`
         SELECT 
-          SUM(CASE WHEN type = 'in' THEN quantity ELSE 0 END) - 
-          SUM(CASE WHEN type = 'out' THEN quantity ELSE 0 END) as current_stock
+          COALESCE(SUM(CASE WHEN type = 'in' THEN quantity ELSE 0 END), 0) - 
+          COALESCE(SUM(CASE WHEN type = 'out' THEN quantity ELSE 0 END), 0) as current_stock
         FROM transactions 
         WHERE item_id = ? AND id != ?
       `, [item_id, id]);
 
-      const currentStock = stockResult[0].current_stock || 0;
+      const currentStock = Number(stockResult[0].current_stock) || 0;
       
-      if (currentStock < quantity) {
+      console.log(`Stock check (update) - Item ID: ${item_id}, Current Stock: ${currentStock}, Requested: ${cleanQuantity}, Excluding transaction ID: ${id}`);
+      
+      if (currentStock < cleanQuantity) {
         return res.status(400).json({ 
           message: `Insufficient stock. Available: ${currentStock}` 
         });
@@ -349,7 +427,7 @@ app.put('/api/transactions/:id', authenticateToken, async (req, res) => {
 
     await db.execute(
       'UPDATE transactions SET item_id = ?, quantity = ?, type = ?, date = ?, supplier = ?, recipient = ?, notes = ?, updated_at = NOW() WHERE id = ?',
-      [item_id, quantity, type, date, cleanSupplier, cleanRecipient, cleanNotes, id]
+      [item_id, cleanQuantity, type, date, cleanSupplier, cleanRecipient, cleanNotes, id]
     );
 
     res.json({ message: 'Transaction updated successfully' });
