@@ -153,7 +153,7 @@ const Report = () => {
                           {item.category}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {item.saldo_awal || 0} {item.unit}
+                          {item.saldo_awal || 0} 
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {item.current_stock} {item.unit}
