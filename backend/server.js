@@ -74,7 +74,7 @@ app.post('/api/auth/login', async (req, res) => {
     // Determine the appropriate error message
     if (!usernameExists && !passwordValid) {
       return res.status(401).json({ 
-        message: 'Username dan password salah',
+        message: 'Salah memasukan username',
         errorType: 'both'
       });
     } else if (!usernameExists) {
@@ -131,7 +131,9 @@ app.get('/api/auth/me', authenticateToken, async (req, res) => {
 app.get('/api/items', authenticateToken, async (req, res) => {
   try {
     const [items] = await db.execute(`
-      SELECT i.*, COALESCE(s.current_stock, 0) as current_stock
+      SELECT 
+        i.*, 
+        COALESCE(i.saldo_awal, 0) + COALESCE(s.current_stock, 0) as current_stock
       FROM items i
       LEFT JOIN (
         SELECT item_id, 
@@ -198,7 +200,7 @@ app.get('/api/debug/stock/:itemId', authenticateToken, async (req, res) => {
 
 app.post('/api/items', authenticateToken, async (req, res) => {
   try {
-    const { name, code, category, unit, min_stock, price, description, input_date } = req.body;
+    const { name, code, category, unit, min_stock, price, description, input_date, saldo_awal } = req.body;
     
     // Handle undefined values by converting them to null
     const cleanCategory = category || null;
@@ -207,6 +209,7 @@ app.post('/api/items', authenticateToken, async (req, res) => {
     const cleanPrice = price || null;
     const cleanDescription = description || null;
     const cleanInputDate = input_date || null;
+    const cleanSaldoAwal = Number(saldo_awal || 0);
     
     // Check if code already exists
     const [existing] = await db.execute(
@@ -219,8 +222,8 @@ app.post('/api/items', authenticateToken, async (req, res) => {
     }
 
     const [result] = await db.execute(
-      'INSERT INTO items (name, code, category, unit, min_stock, price, description, input_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [name, code, cleanCategory, cleanUnit, cleanMinStock, cleanPrice, cleanDescription, cleanInputDate]
+      'INSERT INTO items (name, code, category, unit, min_stock, price, description, saldo_awal, input_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [name, code, cleanCategory, cleanUnit, cleanMinStock, cleanPrice, cleanDescription, cleanSaldoAwal, cleanInputDate]
     );
 
     res.status(201).json({ 
@@ -236,7 +239,7 @@ app.post('/api/items', authenticateToken, async (req, res) => {
 app.put('/api/items/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, code, category, unit, min_stock, price, description, input_date } = req.body;
+    const { name, code, category, unit, min_stock, price, description, input_date, saldo_awal } = req.body;
     
     // Handle undefined values by converting them to null
     const cleanCategory = category || null;
@@ -245,6 +248,7 @@ app.put('/api/items/:id', authenticateToken, async (req, res) => {
     const cleanPrice = price || null;
     const cleanDescription = description || null;
     const cleanInputDate = input_date || null;
+    const cleanSaldoAwal = Number(saldo_awal || 0);
     
     // Check if code already exists for different item
     const [existing] = await db.execute(
@@ -257,8 +261,8 @@ app.put('/api/items/:id', authenticateToken, async (req, res) => {
     }
 
     await db.execute(
-      'UPDATE items SET name = ?, code = ?, category = ?, unit = ?, min_stock = ?, price = ?, description = ?, input_date = ?, updated_at = NOW() WHERE id = ?',
-      [name, code, cleanCategory, cleanUnit, cleanMinStock, cleanPrice, cleanDescription, cleanInputDate, id]
+      'UPDATE items SET name = ?, code = ?, category = ?, unit = ?, min_stock = ?, price = ?, description = ?, saldo_awal = ?, input_date = ?, updated_at = NOW() WHERE id = ?',
+      [name, code, cleanCategory, cleanUnit, cleanMinStock, cleanPrice, cleanDescription, cleanSaldoAwal, cleanInputDate, id]
     );
 
     res.json({ message: 'Item updated successfully' });
@@ -560,12 +564,12 @@ app.get('/api/reports', authenticateToken, async (req, res) => {
     // Stock report
     const [stockReport] = await db.execute(`
       SELECT 
-        i.id, i.name, i.code, i.category, i.unit, i.min_stock, i.price, i.input_date,
-        COALESCE(SUM(CASE WHEN t.type = 'in' THEN t.quantity ELSE 0 END) - 
+        i.id, i.name, i.code, i.category, i.unit, i.min_stock, i.price, i.input_date, i.saldo_awal,
+        COALESCE(i.saldo_awal, 0) + COALESCE(SUM(CASE WHEN t.type = 'in' THEN t.quantity ELSE 0 END) - 
         SUM(CASE WHEN t.type = 'out' THEN t.quantity ELSE 0 END), 0) as current_stock
       FROM items i
       LEFT JOIN transactions t ON i.id = t.item_id
-      GROUP BY i.id, i.name, i.code, i.category, i.unit, i.min_stock, i.price, i.input_date
+      GROUP BY i.id, i.name, i.code, i.category, i.unit, i.min_stock, i.price, i.input_date, i.saldo_awal
       ORDER BY i.name
     `);
 
@@ -609,12 +613,12 @@ app.get('/api/reports', authenticateToken, async (req, res) => {
     const [deadStock] = await db.execute(`
       SELECT 
         i.id, i.name, i.code, i.category, i.unit, i.price, i.input_date,
-        COALESCE(SUM(CASE WHEN t.type = 'in' THEN t.quantity ELSE 0 END) - 
+        COALESCE(i.saldo_awal, 0) + COALESCE(SUM(CASE WHEN t.type = 'in' THEN t.quantity ELSE 0 END) - 
         SUM(CASE WHEN t.type = 'out' THEN t.quantity ELSE 0 END), 0) as current_stock,
         MAX(CASE WHEN t.type = 'out' THEN t.date ELSE NULL END) as last_out_date
       FROM items i
       LEFT JOIN transactions t ON i.id = t.item_id
-      GROUP BY i.id, i.name, i.code, i.category, i.unit, i.price, i.input_date
+      GROUP BY i.id, i.name, i.code, i.category, i.unit, i.price, i.input_date, i.saldo_awal
       HAVING (
         (last_out_date IS NULL OR last_out_date < DATE_SUB(CURDATE(), INTERVAL 6 MONTH))
         AND current_stock > 0

@@ -16,6 +16,7 @@ const MasterData = () => {
     unit: '',
     min_stock: '',
     price: '',
+    saldo_awal: '',
     description: '',
     input_date: ''
   });
@@ -57,6 +58,7 @@ const MasterData = () => {
         unit: formData.unit.trim() || null,
         min_stock: formData.min_stock.trim() || null,
         price: formData.price.trim() || null,
+        saldo_awal: formData.saldo_awal.trim() || 0,
         description: formData.description.trim() || null,
         input_date: formData.input_date.trim() || null
       };
@@ -84,6 +86,7 @@ const MasterData = () => {
       unit: item.unit,
       min_stock: item.min_stock.toString(),
       price: item.price.toString(),
+      saldo_awal: (item.saldo_awal ?? 0).toString(),
       description: item.description || '',
       input_date: item.input_date ? new Date(item.input_date).toISOString().split('T')[0] : ''
     });
@@ -110,6 +113,7 @@ const MasterData = () => {
       unit: '',
       min_stock: '',
       price: '',
+      saldo_awal: '',
       description: '',
       input_date: ''
     });
@@ -270,6 +274,20 @@ const MasterData = () => {
                   required
                   min="0"
                   step="0.01"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Saldo Awal
+                </label>
+                <input
+                  type="number"
+                  name="saldo_awal"
+                  value={formData.saldo_awal}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  min="0"
                 />
               </div>
 
